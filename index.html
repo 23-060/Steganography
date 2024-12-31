@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Steganography</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body>
+    <div class="p-6 bg-gray-100 min-h-screen">
+        <h1 class="text-3xl font-bold text-center text-blue-600 mb-8">Steganography</h1>
+      
+        <div class="bg-white shadow-md rounded-lg p-6 mb-8">
+          <h2 class="text-2xl font-semibold text-gray-700 mb-4">Embed Message</h2>
+          <div class="mb-4">
+            <label
+              for="uploadImage"
+              class="block text-sm font-medium text-gray-600 mb-2"
+              >Upload Image</label
+            >
+            <input
+              type="file"
+              id="uploadImage"
+              accept="image/*"
+              class="block w-full text-sm text-gray-600 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          <div class="mb-4">
+            <label
+              for="message"
+              class="block text-sm font-medium text-gray-600 mb-2"
+              >Message</label
+            >
+            <textarea
+              id="message"
+              placeholder="Enter your message here"
+              class="block w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            ></textarea>
+          </div>
+          <button
+            id="embedButton"
+            class="px-4 py-2 bg-blue-500 text-white rounded-lg shadow hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+          >
+            Embed Message
+          </button>
+          <canvas id="canvas" class="hidden"></canvas>
+          <a
+            id="downloadLink"
+            class="hidden mt-4 inline-block px-4 py-2 bg-green-500 text-white rounded-lg shadow hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
+          >
+            Download Image with Embedded Message
+          </a>
+        </div>
+      
+        <div class="bg-white shadow-md rounded-lg p-6">
+          <h2 class="text-2xl font-semibold text-gray-700 mb-4">Extract Message</h2>
+          <div class="mb-4">
+            <label
+              for="uploadEncodedImage"
+              class="block text-sm font-medium text-gray-600 mb-2"
+              >Upload Encoded Image</label
+            >
+            <input
+              type="file"
+              id="uploadEncodedImage"
+              accept="image/*"
+              class="block w-full text-sm text-gray-600 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          <button
+            id="extractButton"
+            class="px-4 py-2 bg-blue-500 text-white rounded-lg shadow hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+          >
+            Extract Message
+          </button>
+          <p id="extractedMessage" class="mt-4 text-gray-700"></p>
+        </div>
+      </div>      
+    <script>
+      document.getElementById("embedButton").addEventListener("click", () => {
+        const fileInput = document.getElementById("uploadImage");
+        const message = document.getElementById("message").value;
+
+        if (!fileInput.files[0] || !message) {
+          alert("Please upload an image and enter a message.");
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.src = e.target.result;
+          img.onload = () => {
+            const canvas = document.getElementById("canvas");
+            const ctx = canvas.getContext("2d");
+
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+
+            const imageData = ctx.getImageData(
+              0,
+              0,
+              canvas.width,
+              canvas.height
+            );
+            const data = imageData.data;
+
+            const binaryMessage = message
+              .split("")
+              .map((char) => char.charCodeAt(0).toString(2).padStart(8, "0"))
+              .join("");
+            const binaryMessageLength = binaryMessage.length
+              .toString(2)
+              .padStart(32, "0");
+
+            let index = 0;
+            for (let i = 0; i < binaryMessageLength.length; i++) {
+              data[index] =
+                (data[index] & 254) | parseInt(binaryMessageLength[i]);
+              index++;
+            }
+
+            for (let i = 0; i < binaryMessage.length; i++) {
+              data[index] = (data[index] & 254) | parseInt(binaryMessage[i]);
+              index++;
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+
+            const downloadLink = document.getElementById("downloadLink");
+            downloadLink.href = canvas.toDataURL();
+            downloadLink.download = "encoded_image.png";
+            downloadLink.style.display = "block";
+            downloadLink.textContent = "Download Image with Embedded Message";
+          };
+        };
+        reader.readAsDataURL(fileInput.files[0]);
+      });
+
+      document.getElementById("extractButton").addEventListener("click", () => {
+        const fileInput = document.getElementById("uploadEncodedImage");
+
+        if (!fileInput.files[0]) {
+          alert("Please upload an encoded image.");
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.src = e.target.result;
+          img.onload = () => {
+            const canvas = document.getElementById("canvas");
+            const ctx = canvas.getContext("2d");
+
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+
+            const imageData = ctx.getImageData(
+              0,
+              0,
+              canvas.width,
+              canvas.height
+            );
+            const data = imageData.data;
+
+
+            let index = 0;
+            let binaryMessageLength = "";
+            for (let i = 0; i < 32; i++) {
+              binaryMessageLength += (data[index] & 1).toString();
+              index++;
+            }
+            const messageLength = parseInt(binaryMessageLength, 2);
+
+            let binaryMessage = "";
+            for (let i = 0; i < messageLength; i++) {
+              binaryMessage += (data[index] & 1).toString();
+              index++;
+            }
+
+            const extractedMessage = binaryMessage
+              .match(/.{1,8}/g)
+              .map((byte) => String.fromCharCode(parseInt(byte, 2)))
+              .join("");
+
+            document.getElementById(
+              "extractedMessage"
+            ).textContent = `Extracted Message: ${extractedMessage}`;
+          };
+        };
+        reader.readAsDataURL(fileInput.files[0]);
+      });
+    </script>
+  </body>
+</html>
